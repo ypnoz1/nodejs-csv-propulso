@@ -92,6 +92,9 @@ const statsFile = ((req, res) => {
     let pointerNow  = { ...pointerPrev };//current user
     let prevVisitor = { ...pointerPrev };//prev first occurence of current user
     let currVisitor = { ...pointerPrev };//current user
+    let visitInZone = {};
+    let timeInZoneA = '';
+    let timeInZoneB = '';
 
     let statsVisits = {};//save data
     let saveInBetweenVisits = {};
@@ -108,8 +111,14 @@ const statsFile = ((req, res) => {
             let [id, lat, lon, delta, unix_timestamp] = dataLine;
             
             if(id.length > 1 && !Number.isNaN(unix_timestamp) && String(unix_timestamp).length >= 10){//valid date
-                pointerPrev = pointerNow;
-                pointerNow  = { id, lat, lon, delta, unix_timestamp };
+                pointerPrev  = pointerNow;
+                pointerNow   = { id, lat, lon, delta, unix_timestamp };
+
+                if(parseInt(delta) === 0){
+                    if(Object.hasOwn(visitInZone, id)){
+                        visitInZone[id][1] = unix_timestamp;
+                    }
+                }
 
                 const dateVisit = new Date(unix_timestamp * 1000);
                 const month = dateVisit.getMonth() + 1;
@@ -139,7 +148,19 @@ const statsFile = ((req, res) => {
                      *  pointerPrev last occurence of user.
                     **/
                     prevVisitor = currVisitor;
-                    currVisitor = { id, lat, lon, delta, unix_timestamp };
+                    currVisitor = { id, lat, lon, delta, unix_timestamp };                    
+
+                    if(parseInt(delta) === 0){                        
+                        if(Object.hasOwn(visitInZone, prevVisitor.id)){
+                            timeInZoneA = visitInZone[prevVisitor.id][0];
+                            timeInZoneB = visitInZone[prevVisitor.id][1];
+                            visitInZone = {};
+                        }
+                        if(!Object.hasOwn(visitInZone, id)){                                
+                            visitInZone[id] = [];
+                        }
+                        visitInZone[id].push(unix_timestamp);
+                    }
 
                     if(isNewVisit(currVisitor.id, prevVisitor.id)){
                         statsVisits[month].visits += 1;
@@ -148,23 +169,23 @@ const statsFile = ((req, res) => {
                         }
 
                         //range from time [first] to last time [last]
-                        let numberTimeStampStart = parseInt(prevVisitor.unix_timestamp);
-                        let numberTimeStampEnd   = parseInt(pointerPrev.unix_timestamp);
+                        let numberTimeStampStart = parseInt(timeInZoneA);
+                        let numberTimeStampEnd   = parseInt(timeInZoneB);
                         if(isValidTimeStamp(numberTimeStampStart) && isValidTimeStamp(numberTimeStampEnd)){     
                             //duration in secs
                             statsVisits[month].duration.count  += 1;
                             statsVisits[month].duration.total  += Math.abs(numberTimeStampStart - numberTimeStampEnd);
                             statsVisits[month].duration.average = parseInt(statsVisits[month].duration.total / statsVisits[month].duration.count);
-                            
-                            //distance in meter
-                            const distance = getDistanceBetweenPoints(prevVisitor.lat, prevVisitor.lon, pointerPrev.lat, pointerPrev.lon, 'meters');
-                            if(!Number.isNaN(distance) && distance > 0){
-                                statsVisits[month].distance_total += distance;
-    
-                                //speed meter/seconds
-                                statsVisits[month].speed_average = statsVisits[month].distance_total / statsVisits[month].duration.total;
-                            }
                         }
+
+                        //distance in meter
+                        const distance = getDistanceBetweenPoints(prevVisitor.lat, prevVisitor.lon, pointerPrev.lat, pointerPrev.lon, 'meters');
+                        if(!Number.isNaN(distance) && distance > 0){
+                            statsVisits[month].distance_total += distance;
+
+                            //speed meter/seconds
+                            statsVisits[month].speed_average = statsVisits[month].distance_total / statsVisits[month].duration.total;
+                        }                        
                         
                         if(!Object.hasOwn(saveInBetweenVisits, pointerPrev.id)){//last occurence of visit
                             saveInBetweenVisits[pointerPrev.id] = { id: pointerPrev.id, unix_timestamp: pointerPrev.unix_timestamp};
@@ -199,7 +220,6 @@ const statsFile = ((req, res) => {
         let visitAverageDuration  = 0;
         let visitAverageSpeed     = 0;
         let noVisitDayAverage     = 0;
-        let countNoVisitDay       = 0;
         let monthlyDurationRecord = [];
         let monthlySpeedRecord    = [];
         let monthlyVisitRecord    = [];
@@ -224,9 +244,10 @@ const statsFile = ((req, res) => {
 
         monthlyAvgVisit      = parseInt(monthlyAvgVisit / NB_MONTHS);
         monthlyAvgVisitor    = parseInt(monthlyAvgVisitor / NB_MONTHS);
-        visitAverageDuration = parseInt(visitAverageDuration / NB_MONTHS);
+        visitAverageDuration = parseInt((visitAverageDuration / NB_MONTHS));
         visitAverageSpeed    = visitAverageSpeed / NB_MONTHS;
         noVisitDayAverage    = parseInt(noVisitDayAverage / NB_MONTHS);
+
 
         const stats = {
             monthlyAvgVisit,
