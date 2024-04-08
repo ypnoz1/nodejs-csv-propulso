@@ -199,6 +199,7 @@ const statsFile = ((req, res) => {
         let visitAverageDuration  = 0;
         let visitAverageSpeed     = 0;
         let noVisitDayAverage     = 0;
+        let countNoVisitDay       = 0;
         let monthlyDurationRecord = [];
         let monthlySpeedRecord    = [];
         let monthlyVisitRecord    = [];
@@ -206,13 +207,13 @@ const statsFile = ((req, res) => {
 
         Object.keys(statsVisits).forEach(monthKey => {
             const visitorsMonthly = Object.keys(statsVisits[monthKey].visitors).length;
-            const noVisit = statsVisits[monthKey].nb_days_no_visit.nb_days / statsVisits[monthKey].nb_days_no_visit.nb_days
+            const noVisit = statsVisits[monthKey].nb_days_no_visit.nb_days / statsVisits[monthKey].nb_days_no_visit.count
 
             monthlyAvgVisit      += statsVisits[monthKey].visits;
             monthlyAvgVisitor    += visitorsMonthly;
             visitAverageDuration += statsVisits[monthKey].duration.average;
             visitAverageSpeed    += statsVisits[monthKey].speed_average;
-            noVisitDayAverage    += !Number.isNaN(noVisit) ? noVisit : 0;
+            noVisitDayAverage    += noVisit;
 
             const secsToMin       = statsVisits[monthKey].duration.average / 60;
             monthlyDurationRecord.push(secsToMin);
